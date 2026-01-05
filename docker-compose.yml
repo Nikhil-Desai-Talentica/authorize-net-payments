@@ -1,0 +1,68 @@
+version: "3.9"
+services:
+  api:
+    build: .
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - AUTHORIZE_NET_API_LOGIN_ID=${AUTHORIZE_NET_API_LOGIN_ID}
+      - AUTHORIZE_NET_TRANSACTION_KEY=${AUTHORIZE_NET_TRANSACTION_KEY}
+      - AUTHORIZE_NET_ENVIRONMENT=${AUTHORIZE_NET_ENVIRONMENT:-sandbox}
+      - AUTHORIZE_NET_WEBHOOK_SECRET=${AUTHORIZE_NET_WEBHOOK_SECRET}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - JWT_ALGORITHM=${JWT_ALGORITHM:-HS256}
+      - JWT_ACCESS_TOKEN_EXPIRE_MINUTES=${JWT_ACCESS_TOKEN_EXPIRE_MINUTES:-30}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - API_V1_PREFIX=${API_V1_PREFIX:-/api/v1}
+      - CORS_ORIGINS=${CORS_ORIGINS:-}
+      - REDIS_URL=redis://redis:6379/0
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+      - redis
+    volumes:
+      - .:/app
+
+  db:
+    image: postgres:15
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=authorize_net_payments
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+
+  worker:
+    build: .
+    command: uv run python scripts/rq_worker.py
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - AUTHORIZE_NET_API_LOGIN_ID=${AUTHORIZE_NET_API_LOGIN_ID}
+      - AUTHORIZE_NET_TRANSACTION_KEY=${AUTHORIZE_NET_TRANSACTION_KEY}
+      - AUTHORIZE_NET_ENVIRONMENT=${AUTHORIZE_NET_ENVIRONMENT:-sandbox}
+      - AUTHORIZE_NET_WEBHOOK_SECRET=${AUTHORIZE_NET_WEBHOOK_SECRET}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - JWT_ALGORITHM=${JWT_ALGORITHM:-HS256}
+      - JWT_ACCESS_TOKEN_EXPIRE_MINUTES=${JWT_ACCESS_TOKEN_EXPIRE_MINUTES:-30}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - API_V1_PREFIX=${API_V1_PREFIX:-/api/v1}
+      - CORS_ORIGINS=${CORS_ORIGINS:-}
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - db
+      - redis
+    volumes:
+      - .:/app
+
+volumes:
+  db_data:

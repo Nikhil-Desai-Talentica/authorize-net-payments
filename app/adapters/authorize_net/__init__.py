@@ -1,0 +1,2 @@
+"""Authorize.Net adapter package"""
+
