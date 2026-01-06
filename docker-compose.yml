@@ -2,9 +2,9 @@ version: "3.9"
 services:
   api:
     build: .
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    command: sh -c "until pg_isready -h db -U postgres; do echo 'waiting for db'; sleep 1; done; uv run uvicorn app.main:app --host 0.0.0.0 --port 8000"
     environment:
-      - DATABASE_URL=${DATABASE_URL}
+      - DATABASE_URL=${DATABASE_URL:-postgresql+asyncpg://postgres:postgres@db:5432/authorize_net_payments}
       - AUTHORIZE_NET_API_LOGIN_ID=${AUTHORIZE_NET_API_LOGIN_ID}
       - AUTHORIZE_NET_TRANSACTION_KEY=${AUTHORIZE_NET_TRANSACTION_KEY}
       - AUTHORIZE_NET_ENVIRONMENT=${AUTHORIZE_NET_ENVIRONMENT:-sandbox}
@@ -20,8 +20,10 @@ services:
     ports:
       - "8000:8000"
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
     volumes:
       - .:/app
 
@@ -35,6 +37,11 @@ services:
       - "5432:5432"
     volumes:
       - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   redis:
     image: redis:7
@@ -43,9 +50,9 @@ services:
 
   worker:
     build: .
-    command: uv run python scripts/rq_worker.py
+    command: sh -c "until pg_isready -h db -U postgres; do echo 'waiting for db'; sleep 1; done; uv run python scripts/rq_worker.py"
     environment:
-      - DATABASE_URL=${DATABASE_URL}
+      - DATABASE_URL=${DATABASE_URL:-postgresql+asyncpg://postgres:postgres@db:5432/authorize_net_payments}
       - AUTHORIZE_NET_API_LOGIN_ID=${AUTHORIZE_NET_API_LOGIN_ID}
       - AUTHORIZE_NET_TRANSACTION_KEY=${AUTHORIZE_NET_TRANSACTION_KEY}
       - AUTHORIZE_NET_ENVIRONMENT=${AUTHORIZE_NET_ENVIRONMENT:-sandbox}
@@ -59,8 +66,10 @@ services:
       - CORS_ORIGINS=${CORS_ORIGINS:-}
       - REDIS_URL=redis://redis:6379/0
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
     volumes:
       - .:/app
 

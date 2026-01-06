@@ -3,7 +3,9 @@ FROM python:3.12-slim
 WORKDIR /app
 
 # System deps (optional, add as needed)
-RUN apt-get update && apt-get install -y build-essential && rm -rf /var/lib/apt/lists/*
+RUN apt-get update \
+    && apt-get install -y build-essential netcat-traditional postgresql-client \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY pyproject.toml uv.lock ./ 
 
@@ -11,7 +13,9 @@ COPY pyproject.toml uv.lock ./
 RUN pip install uv
 
 # Install deps (no dev extras)
-RUN uv sync --no-dev --frozen
+RUN uv sync
+
+ENV PATH="/app/.venv/bin:${PATH}"
 
 COPY . .
 
